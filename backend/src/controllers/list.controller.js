@@ -80,21 +80,19 @@ const deleteAllLists = asyncHandler(async (req, res) => {
 });
 
 const generateUploadURLs = asyncHandler(async (req, res) => {
-    console.log("step 1 --------------------------")
+    
     const { listid, fileNames } = req.body;
 
-    console.log("step 2 --------------------------")
 
     if (!fileNames || !Array.isArray(fileNames) || fileNames.length === 0) {
         throw new ApiError(400, "fileNames must be a non-empty array");
     }
-    console.log("step 3 --------------------------")
+    
     const list = await List.findOne({ _id: listid, user: req.user._id });
-    console.log("step 4 --------------------------")
+
     if (!list) {
         throw new ApiError(404, "List not found");
     }
-    console.log("step 5 --------------------------")
 
     const presignedUrls = [];
     const urlsKeys = [];
