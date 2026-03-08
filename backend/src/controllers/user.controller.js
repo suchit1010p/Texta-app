@@ -200,7 +200,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user?._id).select("-password -refreshToken");
+    const user = await User.findById(req.user?._id).select("-password");
 
     if (!user) {
         throw new ApiError(404, "User not found");
