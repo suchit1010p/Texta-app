@@ -97,7 +97,7 @@ const generateUploadURLs = asyncHandler(async (req, res) => {
     const presignedUrls = [];
     const urlsKeys = [];
     for (const fileName of fileNames) {
-        const key = `${req.user._id}/${listid}/${Date.now()}_${fileName}`;
+        const key = `files/${req.user._id}_${req.user.username}/${listid}/${Date.now()}_${fileName}`;
         const presignedUrl = await generatePutPresignedUrl(key).catch((error) => {
             console.error("Error generating presigned URL for file:", fileName, error);
             throw new ApiError(500, `Failed to generate presigned URL for file: ${fileName}`);
@@ -106,30 +106,16 @@ const generateUploadURLs = asyncHandler(async (req, res) => {
         urlsKeys.push(key);
     }
 
-    return res.status(200).json(new ApiResponse(200, { presignedUrls, urlsKeys }, "Presigned URLs generated successfully"));
-});
-
-const uploadfiles = asyncHandler(async (req, res) => {
-    const { listid, urlsKeys } = req.body;
-
-    if (!urlsKeys || !Array.isArray(urlsKeys) || urlsKeys.length === 0) {
-        throw new ApiError(400, "URLs keys are required");
-    }
-
-    const list = await List.findOne({ _id: listid, user: req.user._id });
-
-    if (!list) {
-        throw new ApiError(404, "List not found");
-    }
-
     urlsKeys.forEach((key) => {
         list.url.push(key);
     });
 
     await list.save();
 
-    return res.status(200).json(new ApiResponse(200, list, "Media uploaded successfully"));
+    return res.status(200).json(new ApiResponse(200, { presignedUrls, urlsKeys }, "Presigned URLs generated successfully"));
 });
 
 
-export { createList, getLists, getListById, deleteList, updateList, deleteAllLists, uploadfiles, generateUploadURLs };
+
+
+export { createList, getLists, getListById, deleteList, updateList, deleteAllLists, generateUploadURLs };
