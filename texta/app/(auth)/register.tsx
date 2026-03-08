@@ -1,0 +1,110 @@
+import { Text, View, TextInput, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { Link, Redirect } from "expo-router";
+import { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+
+export default function Register() {
+    const { register, isAuthenticated } = useAuth();
+    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    if (isAuthenticated) {
+        return <Redirect href="/(app)/home" />;
+    }
+
+    const onRegister = async () => {
+        if (!username || !email || !password) {
+            setError("Please fill in all fields.");
+            return;
+        }
+        setError("");
+        setLoading(true);
+        try {
+            await register(username, email, password);
+        } catch (err: any) {
+            setError(err?.response?.data?.message || err.message || "Registration failed");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <View style={styles.container}>
+            <Text style={styles.title}>Register</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Username"
+                autoCapitalize="none"
+                value={username}
+                onChangeText={setUsername}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Password"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+            />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Pressable onPress={onRegister} style={styles.button} disabled={loading}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
+            </Pressable>
+            <Link href="/(auth)/login" style={styles.link}>
+                Already have an account? Login
+            </Link>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        justifyContent: "center",
+        padding: 24,
+        backgroundColor: "#fff",
+        gap: 12,
+    },
+    title: {
+        fontSize: 28,
+        fontWeight: "700",
+        marginBottom: 8,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: "#ddd",
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 16,
+    },
+    button: {
+        backgroundColor: "#111827",
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: "center",
+    },
+    buttonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    link: {
+        marginTop: 6,
+        color: "#2563eb",
+        textAlign: "center",
+    },
+    error: {
+        color: "#dc2626",
+    },
+});

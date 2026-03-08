@@ -47,7 +47,10 @@ const getClearCookieOptions = () => {
 
 // register user
 const registerUser = asyncHandler(async (req, res) => {
-    const { username, email, password } = req.body;
+    let { username, email, password } = req.body;
+
+    username = username?.trim();
+    email = email?.trim();
 
     if (
         [username, email, password].some((field) => !field?.trim())
@@ -84,13 +87,20 @@ const registerUser = asyncHandler(async (req, res) => {
         .cookie("accessToken", accessToken, options.access)
         .cookie("refreshToken", refreshToken, options.refresh)
         .json(
-            new ApiResponse(201, createdUser, "User registered successfully")
+            new ApiResponse(
+                201,
+                { user: createdUser, accessToken, refreshToken },
+                "User registered successfully"
+            )
         );
 });
 
 // login user
 const loginUser = asyncHandler(async (req, res) => {
-    const { username, email, password } = req.body;
+    let { username, email, password } = req.body;
+
+    username = username?.trim();
+    email = email?.trim();
 
     if (
         [username || email, password].some((field) => !field?.trim())
@@ -123,10 +133,10 @@ const loginUser = asyncHandler(async (req, res) => {
         .cookie("refreshToken", refreshToken, options.refresh)
         .json(
             new ApiResponse(
-                200, 
+                200,
                 {
                     user: safeUser, accessToken, refreshToken
-                }, 
+                },
                 "User logged in successfully"
             )
         );
