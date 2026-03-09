@@ -17,6 +17,11 @@ const listSchema = new mongoose.Schema(
         url: {
             type: [String],
             default: []
+        },
+        status: {
+            type: String,
+            enum: ["pending", "in-progress", "done"],
+            default: "pending"
         }
     }, { timestamps: true }
 );

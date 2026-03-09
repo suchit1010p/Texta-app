@@ -80,14 +80,14 @@ const deleteAllLists = asyncHandler(async (req, res) => {
 });
 
 const generateUploadURLs = asyncHandler(async (req, res) => {
-    
+
     const { listid, fileNames } = req.body;
 
 
     if (!fileNames || !Array.isArray(fileNames) || fileNames.length === 0) {
         throw new ApiError(400, "fileNames must be a non-empty array");
     }
-    
+
     const list = await List.findOne({ _id: listid, user: req.user._id });
 
     if (!list) {
@@ -115,7 +115,24 @@ const generateUploadURLs = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, { presignedUrls, urlsKeys }, "Presigned URLs generated successfully"));
 });
 
+const updateListStatus = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (status !== undefined && !status?.trim()) {
+        throw new ApiError(400, "Status cannot be empty");
+    }
+
+    const list = await List.findOne({ _id: id, user: req.user._id });
+
+    if (!list) {
+        throw new ApiError(404, "List not found");
+    }
+    if (status !== undefined) list.status = status.trim();
+    await list.save();
+
+    return res.status(200).json(new ApiResponse(200, list, "List status updated successfully"));
+});
 
 
-
-export { createList, getLists, getListById, deleteList, updateList, deleteAllLists, generateUploadURLs };
+export { createList, getLists, getListById, deleteList, updateList, deleteAllLists, generateUploadURLs, updateListStatus };
