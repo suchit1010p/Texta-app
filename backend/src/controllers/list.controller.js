@@ -134,5 +134,59 @@ const updateListStatus = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, list, "List status updated successfully"));
 });
 
+// Helper: parse duration strings like "20s", "25m", "3h", "5d" into milliseconds
+const parseDuration = (durationStr) => {
+    if (!durationStr || typeof durationStr !== "string") {
+        throw new ApiError(400, "Duration is required and must be a string (e.g. '20s', '25m', '3h', '5d')");
+    }
 
-export { createList, getLists, getListById, deleteList, updateList, deleteAllLists, generateUploadURLs, updateListStatus };
+    const match = durationStr.trim().match(/^(\d+)(s|m|h|d)$/i);
+    if (!match) {
+        throw new ApiError(400, "Invalid duration format. Use a number followed by s (seconds), m (minutes), h (hours), or d (days). Example: '20s', '25m', '3h', '5d'");
+    }
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+
+    if (value <= 0) {
+        throw new ApiError(400, "Duration must be a positive number");
+    }
+
+    const multipliers = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
+    return value * multipliers[unit];
+};
+
+const scheduleDeleteList = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { duration } = req.body;
+
+    const ms = parseDuration(duration);
+
+    const list = await List.findOne({ _id: id, user: req.user._id });
+
+    if (!list) {
+        throw new ApiError(404, "List not found");
+    }
+
+    list.scheduledDeleteAt = new Date(Date.now() + ms);
+    await list.save();
+
+    return res.status(200).json(new ApiResponse(200, list, `List scheduled for deletion in ${duration}`));
+});
+
+const cancelScheduledDelete = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const list = await List.findOne({ _id: id, user: req.user._id });
+
+    if (!list) {
+        throw new ApiError(404, "List not found");
+    }
+
+    list.scheduledDeleteAt = null;
+    await list.save();
+
+    return res.status(200).json(new ApiResponse(200, list, "Scheduled deletion cancelled"));
+});
+
+export { createList, getLists, getListById, deleteList, updateList, deleteAllLists, generateUploadURLs, updateListStatus, scheduleDeleteList, cancelScheduledDelete };

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createList, deleteList, deleteAllLists, getLists, updateList, getListById, generateUploadURLs, updateListStatus } from "../controllers/list.controller.js";
+import { createList, deleteList, deleteAllLists, getLists, updateList, getListById, generateUploadURLs, updateListStatus, scheduleDeleteList, cancelScheduledDelete } from "../controllers/list.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
@@ -14,5 +14,8 @@ router.delete("/all", deleteAllLists);
 router.get("/upload", generateUploadURLs);
 
 router.route("/:id").get(getListById).delete(deleteList).put(updateList).patch(updateListStatus);
+
+// Schedule delete routes
+router.route("/:id/schedule-delete").patch(scheduleDeleteList).delete(cancelScheduledDelete);
 
 export default router;
