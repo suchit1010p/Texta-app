@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createList, deleteList, deleteAllLists, getLists, updateList, getListById, generateUploadURLs, updateListStatus, scheduleDeleteList, cancelScheduledDelete } from "../controllers/list.controller.js";
+import { createList, deleteList, deleteAllLists, deleteMultipleLists, getLists, updateList, getListById, generateUploadURLs, updateListStatus, scheduleDeleteList, cancelScheduledDelete } from "../controllers/list.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
@@ -9,8 +9,10 @@ router.use(verifyJWT);
 // List routes
 router.route("/").post(createList).get(getLists).delete(deleteAllLists);
 router.delete("/all", deleteAllLists);
+router.post("/bulk-delete", deleteMultipleLists);
 
 // Upload routes 
+router.post("/upload", generateUploadURLs);
 router.get("/upload", generateUploadURLs);
 
 router.route("/:id").get(getListById).delete(deleteList).put(updateList).patch(updateListStatus);

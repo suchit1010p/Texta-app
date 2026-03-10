@@ -103,6 +103,10 @@ export const updateList = (listId: string, data: { text?: string; description?: 
     return api.put(`/lists/${listId}`, data);
 };
 
+export const updateListStatus = (listId: string, status: "pending" | "in-progress" | "done") => {
+    return api.patch(`/lists/${listId}`, { status });
+};
+
 export const deleteList = (listId: string) => {
     return api.delete(`/lists/${listId}`);
 };
@@ -111,8 +115,14 @@ export const deleteAllLists = () => {
     return api.delete("/lists");
 };
 
+export const deleteMultipleLists = (listIds: string[]) => {
+    return api.post("/lists/bulk-delete", { listIds });
+};
+
 export const generateUploadURLs = (listId: string, fileNames: string[]) => {
-    return api.get("/lists/upload", {
-        data: { listid: listId, fileNames },
-    });
+    return api.post("/lists/upload", { listid: listId, fileNames });
+};
+
+export const scheduleDeleteList = (listId: string, duration: string) => {
+    return api.patch(`/lists/${listId}/schedule-delete`, { duration });
 };

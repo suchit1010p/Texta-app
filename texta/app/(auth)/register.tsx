@@ -10,6 +10,7 @@ export default function Register() {
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
 
     if (isAuthenticated) {
         return <Redirect href="/(app)/home" />;
@@ -49,13 +50,18 @@ export default function Register() {
                 value={email}
                 onChangeText={setEmail}
             />
-            <TextInput
-                style={styles.input}
-                placeholder="Password"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-            />
+            <View style={styles.passwordContainer}>
+                <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Password"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
+                />
+                <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                    <Text style={styles.eyeText}>{showPassword ? "🙈" : "👁️"}</Text>
+                </Pressable>
+            </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Pressable onPress={onRegister} style={styles.button} disabled={loading}>
                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
@@ -87,6 +93,26 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 16,
+    },
+    passwordContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#ddd",
+        borderRadius: 10,
+    },
+    passwordInput: {
+        flex: 1,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 16,
+    },
+    eyeButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    eyeText: {
+        fontSize: 18,
     },
     button: {
         backgroundColor: "#111827",

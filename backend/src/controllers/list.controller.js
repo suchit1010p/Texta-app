@@ -79,13 +79,63 @@ const deleteAllLists = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, null, "All lists deleted successfully"));
 });
 
+const deleteMultipleLists = asyncHandler(async (req, res) => {
+    const { listIds } = req.body;
+
+    if (!Array.isArray(listIds) || listIds.length === 0) {
+        throw new ApiError(400, "listIds must be a non-empty array");
+    }
+
+    const normalizedIds = [...new Set(
+        listIds
+            .filter((id) => typeof id === "string")
+            .map((id) => id.trim())
+            .filter((id) => id)
+    )];
+
+    if (normalizedIds.length === 0) {
+        throw new ApiError(400, "listIds must contain valid string IDs");
+    }
+
+    const invalidIds = normalizedIds.filter((id) => !/^[a-fA-F0-9]{24}$/.test(id));
+    if (invalidIds.length > 0) {
+        throw new ApiError(400, "listIds contains one or more invalid IDs");
+    }
+
+    const result = await List.deleteMany({
+        _id: { $in: normalizedIds },
+        user: req.user._id
+    });
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            {
+                requestedCount: normalizedIds.length,
+                deletedCount: result.deletedCount ?? 0
+            },
+            "Selected lists deleted successfully"
+        )
+    );
+});
+
 const generateUploadURLs = asyncHandler(async (req, res) => {
 
-    const { listid, fileNames } = req.body;
+    const listid = req.body?.listid ?? req.query?.listid;
+    const rawFileNames = req.body?.fileNames ?? req.query?.fileNames;
+    const fileNames = Array.isArray(rawFileNames)
+        ? rawFileNames
+        : typeof rawFileNames === "string"
+            ? rawFileNames.split(",").map((name) => name.trim()).filter(Boolean)
+            : [];
 
 
     if (!fileNames || !Array.isArray(fileNames) || fileNames.length === 0) {
         throw new ApiError(400, "fileNames must be a non-empty array");
+    }
+
+    if (!listid || typeof listid !== "string") {
+        throw new ApiError(400, "listid is required");
     }
 
     const list = await List.findOne({ _id: listid, user: req.user._id });
@@ -189,4 +239,4 @@ const cancelScheduledDelete = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, list, "Scheduled deletion cancelled"));
 });
 
-export { createList, getLists, getListById, deleteList, updateList, deleteAllLists, generateUploadURLs, updateListStatus, scheduleDeleteList, cancelScheduledDelete };
+export { createList, getLists, getListById, deleteList, updateList, deleteAllLists, deleteMultipleLists, generateUploadURLs, updateListStatus, scheduleDeleteList, cancelScheduledDelete };
