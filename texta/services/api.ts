@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 
 const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
 const appConfigApiUrl = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl;
-const fallbackApiUrl = "http://10.177.189.141:8000/api/v1";
+const fallbackApiUrl = "https://0oedipcvpk.execute-api.ap-south-1.amazonaws.com/api/v1";
 
 const API_URL = envApiUrl || appConfigApiUrl || fallbackApiUrl;
 
@@ -38,8 +38,11 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
+        const isRefreshRequest =
+            typeof originalRequest?.url === "string" &&
+            originalRequest.url.includes("/auth/refreshToken");
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isRefreshRequest) {
             originalRequest._retry = true;
 
             try {

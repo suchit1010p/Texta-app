@@ -5,7 +5,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 const generatePutPresignedUrl = async (fileName) => {
     try {
         const command = new PutObjectCommand({
-            Bucket: process.env.AWS_BUCKET_NAME,
+            Bucket: process.env.S3_BUCKET_NAME,
             Key: fileName
         });
         return await getSignedUrl(s3, command, { expiresIn: 3600 });
@@ -20,7 +20,7 @@ const deleteFromS3 = async (fileUrl) => {
         if (!fileUrl) return;
         if (!String(fileUrl).startsWith("http")) {
             const command = new DeleteObjectCommand({
-                Bucket: process.env.AWS_BUCKET_NAME,
+                Bucket: process.env.S3_BUCKET_NAME,
                 Key: decodeURIComponent(String(fileUrl)),
             });
             await s3.send(command);
@@ -32,7 +32,7 @@ const deleteFromS3 = async (fileUrl) => {
         const urlObj = new URL(fileUrl);
         const pathParts = urlObj.pathname.split('/');
 
-        if (urlObj.hostname.startsWith(process.env.AWS_BUCKET_NAME)) {
+        if (urlObj.hostname.startsWith(process.env.S3_BUCKET_NAME)) {
             key = urlObj.pathname.substring(1); // remove leading /
         } else {
             key = urlObj.pathname.split('/').slice(2).join('/');
@@ -45,7 +45,7 @@ const deleteFromS3 = async (fileUrl) => {
         key = decodeURIComponent(key);
 
         const command = new DeleteObjectCommand({
-            Bucket: process.env.AWS_BUCKET_NAME,
+            Bucket: process.env.S3_BUCKET_NAME,
             Key: key,
         });
 
