@@ -47,6 +47,13 @@ interface ListItem {
     _failed?: boolean;
 }
 
+interface DeleteConfirmState {
+    ids: string[];
+    title: string;
+    message: string;
+    snapshot: ListItem[];
+}
+
 // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -97,6 +104,8 @@ export default function Home() {
     const [timerItem, setTimerItem] = useState<ListItem | null>(null);
     const [timerDuration, setTimerDuration] = useState("");
     const [timerSaving, setTimerSaving] = useState(false);
+    const [deleteConfirmState, setDeleteConfirmState] = useState<DeleteConfirmState | null>(null);
+    const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
 
     const flatRef = useRef<FlatList>(null);
     const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
@@ -263,29 +272,50 @@ export default function Home() {
     };
 
     // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const closeDeleteConfirm = () => {
+        if (deleteConfirmLoading) return;
+        setDeleteConfirmState(null);
+    };
+
+    const confirmDeleteLists = async () => {
+        if (!deleteConfirmState || deleteConfirmLoading) return;
+
+        const { ids, snapshot } = deleteConfirmState;
+        setDeleteConfirmLoading(true);
+        setDeleteConfirmState(null);
+
+        setLists((prev) => prev.filter((l) => !ids.includes(l._id)));
+        if (selectedListIds.some((id) => ids.includes(id))) {
+            clearSelection();
+        }
+
+        try {
+            if (ids.length === 1) {
+                await deleteList(ids[0]);
+            } else {
+                await deleteMultipleLists(ids);
+            }
+        } catch {
+            setLists(snapshot);
+            Alert.alert("Error", "Could not delete. Please try again.");
+        } finally {
+            setDeleteConfirmLoading(false);
+        }
+    };
+
     const handleDelete = async (item: ListItem) => {
         setContextItem(null);
         if (item._pending || item._failed) {
             setLists((prev) => prev.filter((l) => l._id !== item._id));
             return;
         }
-        Alert.alert("Delete message", "This message will be permanently deleted.", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Delete",
-                style: "destructive",
-                onPress: async () => {
-                    setLists((prev) => prev.filter((l) => l._id !== item._id));
-                    try {
-                        await deleteList(item._id);
-                    } catch {
-                        // Revert
-                        setLists((prev) => [item, ...prev]);
-                        Alert.alert("Error", "Could not delete. Please try again.");
-                    }
-                },
-            },
-        ]);
+
+        setDeleteConfirmState({
+            ids: [item._id],
+            title: "Delete Message",
+            message: "This message will be permanently deleted.",
+            snapshot: [...lists],
+        });
     };
 
     const isSelectionMode = selectedListIds.length > 0;
@@ -311,29 +341,13 @@ export default function Home() {
     const handleBulkDelete = () => {
         if (selectedListIds.length === 0) return;
         const idsToDelete = [...selectedListIds];
-        const previousLists = [...lists];
 
-        Alert.alert(
-            "Delete selected messages",
-            `Delete ${idsToDelete.length} selected message${idsToDelete.length > 1 ? "s" : ""}?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        setLists((prev) => prev.filter((l) => !idsToDelete.includes(l._id)));
-                        clearSelection();
-                        try {
-                            await deleteMultipleLists(idsToDelete);
-                        } catch {
-                            setLists(previousLists);
-                            Alert.alert("Error", "Could not delete selected messages. Please try again.");
-                        }
-                    },
-                },
-            ]
-        );
+        setDeleteConfirmState({
+            ids: idsToDelete,
+            title: "Delete Selected Messages",
+            message: `Delete ${idsToDelete.length} selected message${idsToDelete.length > 1 ? "s" : ""}?`,
+            snapshot: [...lists],
+        });
     };
 
     // â”€â”€ Edit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -820,6 +834,44 @@ export default function Home() {
 
             {/* â”€â”€ Edit Modal â”€â”€ */}
             <Modal
+                visible={!!deleteConfirmState}
+                transparent
+                animationType="fade"
+                onRequestClose={closeDeleteConfirm}
+            >
+                <Pressable style={styles.modalBackdrop} onPress={closeDeleteConfirm}>
+                    <Pressable style={styles.deleteConfirmCard} onPress={() => { }}>
+                        <View style={styles.deleteConfirmIconWrap}>
+                            <Ionicons name="trash-outline" size={20} color="#dc2626" />
+                        </View>
+                        <Text style={styles.deleteConfirmTitle}>{deleteConfirmState?.title}</Text>
+                        <Text style={styles.deleteConfirmMessage}>{deleteConfirmState?.message}</Text>
+
+                        <View style={styles.deleteConfirmActions}>
+                            <Pressable
+                                onPress={closeDeleteConfirm}
+                                disabled={deleteConfirmLoading}
+                                style={[styles.deleteConfirmCancelBtn, deleteConfirmLoading && { opacity: 0.6 }]}
+                            >
+                                <Text style={styles.deleteConfirmCancelText}>Cancel</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={confirmDeleteLists}
+                                disabled={deleteConfirmLoading}
+                                style={[styles.deleteConfirmDeleteBtn, deleteConfirmLoading && { opacity: 0.6 }]}
+                            >
+                                {deleteConfirmLoading ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Text style={styles.deleteConfirmDeleteText}>Delete</Text>
+                                )}
+                            </Pressable>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            <Modal
                 visible={!!editingItem}
                 transparent
                 animationType="slide"
@@ -1240,6 +1292,75 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(0,0,0,0.35)",
         justifyContent: "center",
         alignItems: "center",
+    },
+    deleteConfirmCard: {
+        width: "84%",
+        maxWidth: 360,
+        backgroundColor: "#fff",
+        borderRadius: 18,
+        paddingHorizontal: 18,
+        paddingTop: 18,
+        paddingBottom: 16,
+        alignItems: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.18,
+        shadowRadius: 22,
+        elevation: 12,
+    },
+    deleteConfirmIconWrap: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: "#fee2e2",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 10,
+    },
+    deleteConfirmTitle: {
+        fontSize: 18,
+        fontWeight: "700",
+        color: "#111827",
+        textAlign: "center",
+    },
+    deleteConfirmMessage: {
+        marginTop: 8,
+        fontSize: 14,
+        lineHeight: 20,
+        color: "#6b7280",
+        textAlign: "center",
+    },
+    deleteConfirmActions: {
+        marginTop: 18,
+        width: "100%",
+        flexDirection: "row",
+        gap: 10,
+    },
+    deleteConfirmCancelBtn: {
+        flex: 1,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#d1d5db",
+        backgroundColor: "#fff",
+        paddingVertical: 11,
+        alignItems: "center",
+    },
+    deleteConfirmCancelText: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#374151",
+    },
+    deleteConfirmDeleteBtn: {
+        flex: 1,
+        borderRadius: 12,
+        backgroundColor: "#dc2626",
+        paddingVertical: 11,
+        alignItems: "center",
+    },
+    deleteConfirmDeleteText: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#fff",
     },
     contextMenu: {
         width: 240,
