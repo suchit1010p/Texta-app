@@ -4,6 +4,23 @@ import { ApiError } from "../utils/ApiError.js";
 import { List } from "../models/list.model.js";
 import { generatePutPresignedUrl, deleteFromS3 } from "../utils/s3.js";
 
+const deleteListFilesFromS3 = async (urls = []) => {
+    const fileUrls = Array.isArray(urls) ? urls.filter(Boolean) : [];
+    if (fileUrls.length === 0) return;
+
+    const deleteResults = await Promise.allSettled(
+        fileUrls.map((fileUrl) => deleteFromS3(fileUrl))
+    );
+
+    const failedDeletions = deleteResults.filter(
+        (result) => result.status === "rejected" || result.value === false
+    );
+
+    if (failedDeletions.length > 0) {
+        throw new ApiError(500, "Failed to delete one or more files from S3");
+    }
+};
+
 const createList = asyncHandler(async (req, res) => {
     const { text, description } = req.body;
 
@@ -43,11 +60,14 @@ const getLists = asyncHandler(async (req, res) => {
 const deleteList = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    try {
-        await List.findByIdAndDelete({ _id: id, user: req.user._id });
-    } catch (error) {
-        throw new ApiError(500, "Failed to delete list");
+    const list = await List.findOne({ _id: id, user: req.user._id });
+    if (!list) {
+        throw new ApiError(404, "List not found");
     }
+
+    await deleteListFilesFromS3(list.url);
+
+    await List.deleteOne({ _id: list._id, user: req.user._id });
 
     return res.status(200).json(new ApiResponse(200, null, "List deleted successfully"));
 });
@@ -74,6 +94,11 @@ const updateList = asyncHandler(async (req, res) => {
 });
 
 const deleteAllLists = asyncHandler(async (req, res) => {
+    const lists = await List.find({ user: req.user._id }).select("url");
+    const allUrls = lists.flatMap((list) => (Array.isArray(list.url) ? list.url : []));
+
+    await deleteListFilesFromS3(allUrls);
+
     await List.deleteMany({ user: req.user._id });
 
     return res.status(200).json(new ApiResponse(200, null, "All lists deleted successfully"));
@@ -101,6 +126,14 @@ const deleteMultipleLists = asyncHandler(async (req, res) => {
     if (invalidIds.length > 0) {
         throw new ApiError(400, "listIds contains one or more invalid IDs");
     }
+
+    const listsToDelete = await List.find({
+        _id: { $in: normalizedIds },
+        user: req.user._id
+    }).select("url");
+
+    const allUrls = listsToDelete.flatMap((list) => (Array.isArray(list.url) ? list.url : []));
+    await deleteListFilesFromS3(allUrls);
 
     const result = await List.deleteMany({
         _id: { $in: normalizedIds },
