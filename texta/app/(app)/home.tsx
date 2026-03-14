@@ -94,8 +94,6 @@ export default function Home() {
 
     // Edit state
     const [editingItem, setEditingItem] = useState<ListItem | null>(null);
-    const [editText, setEditText] = useState("");
-    const [editSaving, setEditSaving] = useState(false);
 
     // Context-menu state (long-press)
     const [contextItem, setContextItem] = useState<ListItem | null>(null);
@@ -180,6 +178,22 @@ export default function Home() {
         const text = inputText.trim();
         if ((!text && selectedFiles.length === 0) || sending) return;
 
+        if (editingItem) {
+            setSending(true);
+            try {
+                const res = await updateList(editingItem._id, { text });
+                const updated: ListItem = res.data.data;
+                setLists((prev) => prev.map((l) => (l._id === updated._id ? updated : l)));
+                setEditingItem(null);
+                setInputText("");
+            } catch {
+                Alert.alert("Error", "Could not save changes.");
+            } finally {
+                setSending(false);
+            }
+            return;
+        }
+
         const optimisticId = `opt-${Date.now()}`;
         const optimistic: ListItem = {
             _id: optimisticId,
@@ -221,11 +235,11 @@ export default function Home() {
                         const fileResp = await fetch(file.uri);
                         const blob = await fileResp.blob();
                         const uploadResp = await fetch(uploadUrl, {
-                        method: "PUT",
-                        body: blob,
-                        headers: {
+                            method: "PUT",
+                            body: blob,
+                            headers: {
                                 "Content-Type": file.mimeType || "application/octet-stream"
-                        }
+                            }
                         });
                         if (!uploadResp.ok) {
                             throw new Error(`Upload failed for ${file.name}`);
@@ -354,7 +368,7 @@ export default function Home() {
     const openEdit = (item: ListItem) => {
         setContextItem(null);
         setEditingItem(item);
-        setEditText(item.text);
+        setInputText(item.text);
     };
 
     const handleCopyListContent = async (item: ListItem) => {
@@ -372,20 +386,7 @@ export default function Home() {
         }
     };
 
-    const handleSaveEdit = async () => {
-        if (!editingItem || !editText.trim() || editSaving) return;
-        setEditSaving(true);
-        try {
-            const res = await updateList(editingItem._id, { text: editText.trim() });
-            const updated: ListItem = res.data.data;
-            setLists((prev) => prev.map((l) => (l._id === updated._id ? updated : l)));
-            setEditingItem(null);
-        } catch {
-            Alert.alert("Error", "Could not save changes.");
-        } finally {
-            setEditSaving(false);
-        }
-    };
+
 
     const handleChangeStatus = async (item: ListItem, status: ListItem["status"]) => {
         if (item._pending || item._failed || item.status === status) return;
@@ -571,53 +572,53 @@ export default function Home() {
                         styles.listCard,
                         isSelected && styles.listCardSelected,
                     ]}>
-                    <View style={[styles.listStatusLine, { backgroundColor: statusLineColor }]} />
-                    <View style={styles.listCardBody}>
-                        <Text
-                            style={styles.listPreviewText}
-                            numberOfLines={isExpanded ? undefined : 4}
-                        >
-                            {item.text?.trim() || fileName}
-                        </Text>
+                        <View style={[styles.listStatusLine, { backgroundColor: statusLineColor }]} />
+                        <View style={styles.listCardBody}>
+                            <Text
+                                style={styles.listPreviewText}
+                                numberOfLines={isExpanded ? undefined : 4}
+                            >
+                                {item.text?.trim() || fileName}
+                            </Text>
 
-                        {fileUrls.length > 0 && isExpanded && (
-                            <View style={styles.attachmentList}>
-                                {fileUrls.map((fileKey) => {
-                                    const fileUrl = toPublicFileUrl(fileKey);
-                                    const isImage = /\.(jpeg|jpg|gif|png|webp)$/i.test(fileKey);
-                                    const attachmentName = fileKey.split("_").pop() || "Attachment";
-                                    return (
-                                        <Pressable
-                                            key={fileKey}
-                                            style={({ pressed }) => [styles.attachmentRow, pressed && { opacity: 0.8 }]}
-                                            onPress={() => handleOpenAttachment(fileKey)}
-                                        >
-                                            {isImage ? (
-                                                <Image
-                                                    source={{ uri: fileUrl }}
-                                                    style={styles.attachmentImage}
-                                                    resizeMode="cover"
-                                                />
-                                            ) : (
-                                                <View style={styles.attachmentIconWrap}>
-                                                    <Ionicons name="document-text-outline" size={18} color="#374151" />
-                                                </View>
-                                            )}
-                                            <Text style={styles.attachmentName} numberOfLines={1}>{attachmentName}</Text>
-                                            <Ionicons name="open-outline" size={16} color="#6b7280" />
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-                        )}
-                        {isFailed && (
-                            <Pressable onPress={() => handleRetry(item)} style={styles.retryInlineBtn}>
-                                <Ionicons name="alert-circle" size={15} color="#dc2626" />
-                                <Text style={styles.retryInlineText}>Retry</Text>
-                            </Pressable>
-                        )}
+                            {fileUrls.length > 0 && isExpanded && (
+                                <View style={styles.attachmentList}>
+                                    {fileUrls.map((fileKey) => {
+                                        const fileUrl = toPublicFileUrl(fileKey);
+                                        const isImage = /\.(jpeg|jpg|gif|png|webp)$/i.test(fileKey);
+                                        const attachmentName = fileKey.split("_").pop() || "Attachment";
+                                        return (
+                                            <Pressable
+                                                key={fileKey}
+                                                style={({ pressed }) => [styles.attachmentRow, pressed && { opacity: 0.8 }]}
+                                                onPress={() => handleOpenAttachment(fileKey)}
+                                            >
+                                                {isImage ? (
+                                                    <Image
+                                                        source={{ uri: fileUrl }}
+                                                        style={styles.attachmentImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                ) : (
+                                                    <View style={styles.attachmentIconWrap}>
+                                                        <Ionicons name="document-text-outline" size={18} color="#374151" />
+                                                    </View>
+                                                )}
+                                                <Text style={styles.attachmentName} numberOfLines={1}>{attachmentName}</Text>
+                                                <Ionicons name="open-outline" size={16} color="#6b7280" />
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            )}
+                            {isFailed && (
+                                <Pressable onPress={() => handleRetry(item)} style={styles.retryInlineBtn}>
+                                    <Ionicons name="alert-circle" size={15} color="#dc2626" />
+                                    <Text style={styles.retryInlineText}>Retry</Text>
+                                </Pressable>
+                            )}
+                        </View>
                     </View>
-                </View>
                 </Pressable>
             </Swipeable>
         );
@@ -720,7 +721,18 @@ export default function Home() {
 
             {/* â”€â”€ Floating Input Bar â”€â”€ */}
             <View style={[styles.inputContainer, { bottom: keyboardBottom }]}>
-                {selectedFiles.length > 0 && (
+                {editingItem && (
+                    <View style={styles.selectedFilePill}>
+                        <Ionicons name="pencil" size={14} color="#4b5563" />
+                        <Text style={styles.selectedFileText} numberOfLines={1}>
+                            Editing message
+                        </Text>
+                        <Pressable onPress={() => { setEditingItem(null); setInputText(""); }} hitSlop={10}>
+                            <Ionicons name="close-circle" size={18} color="#9ca3af" />
+                        </Pressable>
+                    </View>
+                )}
+                {selectedFiles.length > 0 && !editingItem && (
                     <View style={styles.selectedFilePill}>
                         <Ionicons name="document-text" size={16} color="#4b5563" />
                         <Text style={styles.selectedFileText} numberOfLines={1}>
@@ -736,8 +748,8 @@ export default function Home() {
 
                 <View style={styles.inputBar}>
                     <Pressable
-                        onPress={handlePickFile}
-                        style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.5 }]}
+                        onPress={editingItem ? undefined : handlePickFile}
+                        style={({ pressed }) => [styles.iconBtn, (pressed || editingItem) && { opacity: 0.5 }]}
                     >
                         <Ionicons name="add" size={22} color="#111827" />
                     </Pressable>
@@ -765,7 +777,7 @@ export default function Home() {
                             <ActivityIndicator size="small" color="#9ca3af" />
                         ) : (
                             <Ionicons
-                                name="arrow-up"
+                                name={editingItem ? "checkmark" : "arrow-up"}
                                 size={18}
                                 color={(inputText.trim() || selectedFiles.length > 0) ? "#fff" : "#9ca3af"}
                             />
@@ -872,63 +884,21 @@ export default function Home() {
             </Modal>
 
             <Modal
-                visible={!!editingItem}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setEditingItem(null)}
-            >
-                <Pressable style={styles.modalBackdrop} onPress={() => setEditingItem(null)}>
-                    <Pressable style={styles.editSheet} onPress={() => { }}>
-                        <View style={styles.editHandle} />
-                        <Text style={styles.editTitle}>Edit message</Text>
-
-                        <TextInput
-                            style={styles.editInput}
-                            value={editText}
-                            onChangeText={setEditText}
-                            multiline
-                            autoFocus
-                            placeholder="Message"
-                            placeholderTextColor="#9ca3af"
-                        />
-
-                        <View style={styles.editActions}>
-                            <Pressable
-                                onPress={() => setEditingItem(null)}
-                                style={styles.editCancelBtn}
-                            >
-                                <Text style={styles.editCancelText}>Cancel</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={handleSaveEdit}
-                                disabled={editSaving || !editText.trim()}
-                                style={[styles.editSaveBtn, (!editText.trim() || editSaving) && { opacity: 0.5 }]}
-                            >
-                                {editSaving ? (
-                                    <ActivityIndicator size="small" color="#fff" />
-                                ) : (
-                                    <Text style={styles.editSaveText}>Save</Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </Pressable>
-                </Pressable>
-            </Modal>
-
-            <Modal
                 visible={!!timerItem}
                 transparent
-                animationType="slide"
+                animationType="fade"
                 onRequestClose={closeTimerModal}
             >
                 <Pressable style={styles.modalBackdrop} onPress={closeTimerModal}>
-                    <Pressable style={styles.editSheet} onPress={() => { }}>
-                        <View style={styles.editHandle} />
-                        <Text style={styles.editTitle}>Add delete timer</Text>
-                        <Text style={styles.timerHint}>Enter duration like 1d, 3h, 25m or 20s.</Text>
+                    <Pressable style={styles.deleteConfirmCard} onPress={() => { }}>
+                        <View style={[styles.deleteConfirmIconWrap, { backgroundColor: '#e0f2fe' }]}>
+                            <Ionicons name="time-outline" size={22} color="#0284c7" />
+                        </View>
+                        <Text style={styles.deleteConfirmTitle}>Add delete timer</Text>
+                        <Text style={styles.deleteConfirmMessage}>Enter duration like 1d, 3h, 25m or 20s.</Text>
 
                         <TextInput
-                            style={styles.editInput}
+                            style={[styles.editInput, { width: '100%', minHeight: 48, marginTop: 16, marginBottom: 0 }]}
                             value={timerDuration}
                             onChangeText={setTimerDuration}
                             autoFocus
@@ -937,22 +907,23 @@ export default function Home() {
                             autoCapitalize="none"
                         />
 
-                        <View style={styles.editActions}>
+                        <View style={styles.deleteConfirmActions}>
                             <Pressable
                                 onPress={closeTimerModal}
-                                style={styles.editCancelBtn}
+                                disabled={timerSaving}
+                                style={[styles.deleteConfirmCancelBtn, timerSaving && { opacity: 0.6 }]}
                             >
-                                <Text style={styles.editCancelText}>Cancel</Text>
+                                <Text style={styles.deleteConfirmCancelText}>Cancel</Text>
                             </Pressable>
                             <Pressable
                                 onPress={handleSaveTimer}
                                 disabled={timerSaving || !timerDuration.trim()}
-                                style={[styles.editSaveBtn, (!timerDuration.trim() || timerSaving) && { opacity: 0.5 }]}
+                                style={[styles.deleteConfirmDeleteBtn, { backgroundColor: '#0284c7' }, (!timerDuration.trim() || timerSaving) && { opacity: 0.6 }]}
                             >
                                 {timerSaving ? (
                                     <ActivityIndicator size="small" color="#fff" />
                                 ) : (
-                                    <Text style={styles.editSaveText}>Set Timer</Text>
+                                    <Text style={styles.deleteConfirmDeleteText}>Set</Text>
                                 )}
                             </Pressable>
                         </View>

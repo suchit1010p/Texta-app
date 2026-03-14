@@ -3,6 +3,9 @@ import { Link, Redirect } from "expo-router";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
+const INPUT_TEXT_COLOR = "#111827";
+const INPUT_PLACEHOLDER_COLOR = "#6b7280";
+
 export default function Register() {
     const { register, isAuthenticated } = useAuth();
     const [username, setUsername] = useState("");
@@ -38,6 +41,7 @@ export default function Register() {
             <TextInput
                 style={styles.input}
                 placeholder="Username"
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 autoCapitalize="none"
                 value={username}
                 onChangeText={setUsername}
@@ -45,6 +49,7 @@ export default function Register() {
             <TextInput
                 style={styles.input}
                 placeholder="Email"
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -54,6 +59,7 @@ export default function Register() {
                 <TextInput
                     style={styles.passwordInput}
                     placeholder="Password"
+                    placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                     secureTextEntry={!showPassword}
                     value={password}
                     onChangeText={setPassword}
@@ -93,6 +99,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 16,
+        color: INPUT_TEXT_COLOR,
     },
     passwordContainer: {
         flexDirection: "row",
@@ -106,6 +113,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 16,
+        color: INPUT_TEXT_COLOR,
     },
     eyeButton: {
         paddingHorizontal: 12,
