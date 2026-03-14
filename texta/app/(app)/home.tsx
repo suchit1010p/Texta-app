@@ -31,7 +31,7 @@ import { useAuth } from "../../context/AuthContext";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Swipeable from "react-native-gesture-handler/Swipeable";
-import { getAllLists, createList, deleteList, deleteMultipleLists, updateList, updateListStatus, scheduleDeleteList, generateUploadURLs, getListById } from "../../services/api";
+import { getAllLists, createList, deleteList, deleteMultipleLists, updateList, updateListStatus, scheduleDeleteList, cancelScheduledDeleteList, generateUploadURLs, getListById } from "../../services/api";
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface ListItem {
@@ -42,6 +42,7 @@ interface ListItem {
     status: "pending" | "in-progress" | "done";
     createdAt: string;
     updatedAt: string;
+    scheduledDeleteAt?: string;
     // optimistic helpers
     _pending?: boolean;
     _failed?: boolean;
@@ -132,6 +133,7 @@ export default function Home() {
         if (!silent) setLoading(true);
         try {
             const res = await getAllLists();
+            // Store ISO strings properly for schedule times
             setLists(res.data.data ?? []);
         } catch {
             // silently fail on refresh
@@ -425,13 +427,33 @@ export default function Home() {
 
         setTimerSaving(true);
         try {
-            await scheduleDeleteList(timerItem._id, duration);
+            const res = await scheduleDeleteList(timerItem._id, duration);
+            const updated = res.data.data;
+            setLists((prev) => prev.map((l) => (l._id === updated._id ? { ...l, scheduledDeleteAt: updated.scheduledDeleteAt } : l)));
             closeTimerModal();
             Alert.alert("Timer added", `List will be deleted in ${duration}.`);
         } catch {
             Alert.alert("Error", "Could not schedule delete timer.");
         } finally {
             setTimerSaving(false);
+        }
+    };
+
+    const handleCancelTimer = async (item: ListItem) => {
+        if (item._pending || item._failed || !item.scheduledDeleteAt) return;
+
+        try {
+            await cancelScheduledDeleteList(item._id);
+            setLists((prev) => prev.map((l) => {
+                if (l._id === item._id) {
+                    const { scheduledDeleteAt, ...rest } = l;
+                    return rest;
+                }
+                return l;
+            }));
+            Alert.alert("Timer Cancelled", "The scheduled deletion has been cancelled.");
+        } catch {
+            Alert.alert("Error", "Could not cancel delete timer.");
         }
     };
 
@@ -483,21 +505,41 @@ export default function Home() {
         const disableSwipe = isSelectionMode || isPending || isFailed;
         const statusLineColor = getStatusLineColor(item.status);
 
-        const renderTimerAction = () => (
-            <View style={styles.swipeActionLeftWrap}>
-                <Pressable
-                    style={styles.swipeActionTimer}
-                    onPress={() => {
-                        closeSwipeFor(item._id);
-                        openTimerForList(item);
-                    }}
-                    disabled={disableSwipe}
-                >
-                    <Ionicons name="time-outline" size={16} color="#fff" />
-                    <Text style={styles.swipeActionText}>Timer</Text>
-                </Pressable>
-            </View>
-        );
+        const renderTimerAction = () => {
+            if (item.scheduledDeleteAt) {
+                const isExpired = new Date(item.scheduledDeleteAt) <= new Date();
+                return (
+                    <View style={styles.swipeActionLeftWrap}>
+                        <Pressable
+                            style={[styles.swipeActionTimer, { backgroundColor: '#dc2626' }]}
+                            onPress={() => {
+                                closeSwipeFor(item._id);
+                                handleCancelTimer(item);
+                            }}
+                            disabled={disableSwipe}
+                        >
+                            <Ionicons name="close-circle-outline" size={16} color="#fff" />
+                            <Text style={styles.swipeActionText}>Cancel Timer</Text>
+                        </Pressable>
+                    </View>
+                );
+            }
+            return (
+                <View style={styles.swipeActionLeftWrap}>
+                    <Pressable
+                        style={styles.swipeActionTimer}
+                        onPress={() => {
+                            closeSwipeFor(item._id);
+                            openTimerForList(item);
+                        }}
+                        disabled={disableSwipe}
+                    >
+                        <Ionicons name="time-outline" size={16} color="#fff" />
+                        <Text style={styles.swipeActionText}>Timer</Text>
+                    </Pressable>
+                </View>
+            );
+        };
 
         const renderStatusActions = () => (
             <View style={styles.swipeActionRightWrap}>
@@ -574,12 +616,24 @@ export default function Home() {
                     ]}>
                         <View style={[styles.listStatusLine, { backgroundColor: statusLineColor }]} />
                         <View style={styles.listCardBody}>
-                            <Text
-                                style={styles.listPreviewText}
-                                numberOfLines={isExpanded ? undefined : 4}
-                            >
-                                {item.text?.trim() || fileName}
-                            </Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <Text
+                                    style={[styles.listPreviewText, { flex: 1, marginRight: 8 }]}
+                                    numberOfLines={isExpanded ? undefined : 4}
+                                >
+                                    {item.text?.trim() || fileName}
+                                </Text>
+                                {item.scheduledDeleteAt && (
+                                    <View style={styles.activeTimerPill}>
+                                        <Ionicons name="timer-outline" size={12} color="#0284c7" />
+                                        <Text style={styles.activeTimerPillText}>
+                                            {new Date(item.scheduledDeleteAt) > new Date()
+                                                ? formatTime(item.scheduledDeleteAt)
+                                                : "Expiring"}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
 
                             {fileUrls.length > 0 && isExpanded && (
                                 <View style={styles.attachmentList}>
@@ -1175,6 +1229,20 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         paddingHorizontal: 4,
+    },
+    activeTimerPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#e0f2fe',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+        gap: 4,
+    },
+    activeTimerPillText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#0284c7',
     },
     swipeActionText: {
         color: "#fff",

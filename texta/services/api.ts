@@ -129,3 +129,7 @@ export const generateUploadURLs = (listId: string, fileNames: string[]) => {
 export const scheduleDeleteList = (listId: string, duration: string) => {
     return api.patch(`/lists/${listId}/schedule-delete`, { duration });
 };
+
+export const cancelScheduledDeleteList = (listId: string) => {
+    return api.delete(`/lists/${listId}/schedule-delete`);
+};
